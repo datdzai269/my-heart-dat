@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I Love You to Heart Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #030712;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        // 1. Tạo điểm ảnh từ chữ "I LOVE YOU" bằng một Offscreen Canvas
+        const textCanvas = document.createElement('canvas');
+        const tCtx = textCanvas.getContext('2d');
+        textCanvas.width = 700;
+        textCanvas.height = 200;
+        tCtx.font = 'bold 75px Arial';
+        tCtx.fillStyle = 'white';
+        tCtx.textAlign = 'center';
+        tCtx.textBaseline = 'middle';
+        tCtx.fillText('I LOVE YOU', 350, 100);
+
+        const imgData = tCtx.getImageData(0, 0, 700, 200);
+        const textPoints = [];
+        for (let y = 0; y < 200; y += 4) {
+            for (let x = 0; x < 700; x += 4) {
+                const index = (y * 700 + x) * 4;
+                if (imgData.data[index + 3] > 128) {
+                    textPoints.push({
+                        x: x - 350 + cx,
+                        y: y - 100 + cy,
+                        originalX: x 
+                    });
+                }
+            }
+        }
+        textPoints.sort((a, b) => a.originalX - b.originalX);
+        const heartPoints = [];
+        const totalParticles = textPoints.length;
+        for (let i = 0; i < totalParticles; i++) {
+            const t = (i / totalParticles) * Math.PI * 2;
+            const hx = 16 * Math.pow(Math.sin(t), 3);
+            const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+            heartPoints.push({
+                x: hx * 16 + cx,
+                y: hy * 16 + cy
+            });
+        }
+
+        const particles = [];
+        for (let i = 0; i < totalParticles; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: canvas.height + 50, // Xuất phát từ dưới bay lên
+                targetX: textPoints[i].x,
+                targetY: textPoints[i].y,
+                size: Math.random() * 2 + 1.5,
+                color: Math.random() > 0.3 ? '#ff4d94' : '#ffb3d1',
+                delay: i * 1.5 
+            });
+        }
+
+        let phase = 'toText'; 
+        let timer = 0;
+        const fireflies = Array.from({ length: 60 }, () => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            vy: -Math.random() * 0.5 - 0.2,
+            size: Math.random() * 2 + 1
+        }));
+
+        function animate() {
+            ctx.fillStyle = 'rgba(3, 7, 18, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            fireflies.forEach(f => {
+                ctx.fillStyle = '#ffe3a8';
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.size, 0, Math.PI * 2);
+                ctx.fill();
+                f.y += f.vy;
+                if (f.y < 0) f.y = canvas.height + 10;
+            });
+
+            timer++;
+            if (phase === 'toText' && timer > 250) {
+                phase = 'waiting';
+                timer = 0;
+            } else if (phase === 'waiting' && timer > 180) { 
+                phase = 'toHeart';
+                particles.forEach((p, idx) => {
+                    p.targetX = heartPoints[idx].x;
+                    p.targetY = heartPoints[idx].y;
+                });
+                timer = 0;
+            } else if (phase === 'toHeart' && timer > 150) {
+                phase = 'heartPulse';
+            }
+
+            particles.forEach((p, idx) => {
+                if (phase === 'toText') {
+                    if (timer < p.delay) return; 
+                }
+
+                p.x += (p.targetX - p.x) * 0.04;
+                p.y += (p.targetY - p.y) * 0.04;
+                let drawX = p.x;
+                let drawY = p.y;
+                if (phase === 'heartPulse') {
+                    const pulse = 1 + Math.sin(Date.now() * 0.005) * 0.03;
+                    drawX = cx + (p.targetX - cx) * pulse;
+                    drawY = cy + (p.targetY - cy) * pulse;
+                }
+
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(drawX, drawY, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
